@@ -1,0 +1,101 @@
+# =============================================================================
+# Investor Lead Pipeline - Configuration
+# =============================================================================
+# Copy this file to config.yaml and fill in your API keys.
+# DO NOT commit config.yaml to git — it contains secrets.
+# =============================================================================
+
+# --- API Keys (fill these in) ---
+api_keys:
+  apollo: ""           # Apollo.io API key (Settings > Integrations > API)
+  census: ""           # Census Bureau API key (api.census.gov/data/key_signup.html)
+  attom: ""            # ATTOM Data API key (api.gateway.attomdata.com)
+  opencorporates: ""   # OpenCorporates API token (optional, free tier works without)
+  numverify: ""        # NumVerify API key (numverify.com)
+
+# --- Geographic Targeting ---
+targeting:
+  # Target states (2-letter codes)
+  states:
+    - "CT"
+    - "NY"
+    - "CA"
+    - "FL"
+    - "TX"
+    - "NJ"
+
+  # Census filters — only search zip codes/tracts meeting these thresholds
+  min_median_income: 120000        # Minimum median household income
+  min_median_home_value: 750000    # Minimum median home value
+
+  # Property filters
+  min_property_value: 2000000      # Only pull properties assessed at this value or above
+
+# --- Lead Scoring Weights (must sum to 100) ---
+scoring:
+  weights:
+    property_value: 25
+    multi_property: 8
+    business_ownership: 20
+    sec_filing_match: 15
+    apollo_title_seniority: 10
+    apollo_company_revenue: 7
+    area_wealth_index: 5
+    phone_reachability: 5
+    recency_signal: 5
+
+  # Property value scoring brackets
+  property_brackets:
+    - min: 3000000
+      points: 25          # $3M+ = full points
+    - min: 2000000
+      points: 18          # $2M-$3M
+    - min: 1500000
+      points: 10          # $1.5M-$2M
+    - min: 0
+      points: 0
+
+  # Title seniority scoring
+  title_scores:
+    c_suite: 10            # CEO, CFO, CTO, COO, etc.
+    vp_partner: 10         # VP, Managing Partner, Partner
+    director: 7
+    manager: 3
+    other: 0
+
+  # Score tier thresholds
+  tiers:
+    hot: 80                # 80-100
+    warm: 60               # 60-79
+    cool: 40               # 40-59
+    skip: 0                # 0-39
+
+# --- Apollo API Settings ---
+apollo:
+  base_url: "https://api.apollo.io/api/v1"
+  rate_limit_per_minute: 50        # Adjust based on your plan
+  enrich_fields:
+    - "email"
+    - "phone"
+    - "title"
+    - "company"
+    - "linkedin_url"
+    - "seniority"
+    - "company_revenue"
+
+# --- Output Settings ---
+output:
+  format: "xlsx"                   # xlsx or csv
+  color_code_tiers: true           # Color rows by tier in Excel
+  separate_sheets_by_tier: true    # One sheet per tier
+  include_all_fields: true         # Include all enrichment data
+  output_dir: "data/output"
+
+# --- Pipeline Settings ---
+pipeline:
+  batch_size: 50                   # Records per API batch
+  max_concurrent_requests: 5       # Async concurrency limit
+  retry_attempts: 3                # Retries on API failure
+  retry_delay_seconds: 2           # Delay between retries
+  dedup_by: ["name", "address"]    # Deduplication fields
+  log_level: "INFO"                # DEBUG, INFO, WARNING, ERROR

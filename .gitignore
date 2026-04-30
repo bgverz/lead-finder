@@ -1,0 +1,31 @@
+# Config with secrets
+config/config.yaml
+
+# Data files
+data/raw/
+data/processed/
+data/output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
