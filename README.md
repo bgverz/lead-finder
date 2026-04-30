@@ -19,7 +19,7 @@ Built for pre-IPO / secondary market sales teams selling shares in late-stage pr
 
 ```bash
 # Clone and install
-git clone <repo-url>
+git clone (https://github.com/bgverz/lead-finder)
 cd investor-lead-pipeline
 pip install -r requirements.txt
 
