@@ -1,0 +1,6 @@
+name,phone,phone_valid,phone_line_type,email,source
+Jordan Whitaker,+12035550101,True,mobile,jordan@example.test,sample_contacts
+Priya Shah,+12035550102,True,landline,priya@example.test,sample_contacts
+Marcus Lee,+12035550103,False,,marcus@example.test,sample_contacts
+Daniel Kim,+15615550104,True,mobile,daniel@example.test,sample_contacts
+Elena Rossi,+12035550105,True,mobile,elena@example.test,sample_contacts

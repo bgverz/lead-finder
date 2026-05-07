@@ -1,101 +1,274 @@
-# =============================================================================
-# Investor Lead Pipeline - Configuration
-# =============================================================================
-# Copy this file to config.yaml and fill in your API keys.
-# DO NOT commit config.yaml to git — it contains secrets.
-# =============================================================================
+# Accredited Investor Lead Pipeline configuration.
+# Copy to config/config.yaml and add API keys only if using sources.mode: api.
 
-# --- API Keys (fill these in) ---
 api_keys:
-  apollo: ""           # Apollo.io API key (Settings > Integrations > API)
-  census: ""           # Census Bureau API key (api.census.gov/data/key_signup.html)
-  attom: ""            # ATTOM Data API key (api.gateway.attomdata.com)
-  opencorporates: ""   # OpenCorporates API token (optional, free tier works without)
-  numverify: ""        # NumVerify API key (numverify.com)
+  census: ""
+  attom: ""
+  opencorporates: ""
+  sec_user_agent: "InvestorLeadPipeline/1.0 contact@example.com"
+  apollo: ""
+  numverify: ""
+  abstractapi: ""
 
-# --- Geographic Targeting ---
 targeting:
-  # Target states (2-letter codes)
-  states:
-    - "CT"
-    - "NY"
-    - "CA"
-    - "FL"
-    - "TX"
-    - "NJ"
+  states: ["CT", "FL"]
+  metros: []
+  counties: []
+  zip_codes: []
+  census_tracts: []
+  min_median_income: 100000
+  min_median_home_value: 750000
+  min_property_value: 1500000
 
-  # Census filters — only search zip codes/tracts meeting these thresholds
-  min_median_income: 120000        # Minimum median household income
-  min_median_home_value: 750000    # Minimum median home value
+sources:
+  # sample runs fully offline using data/sample/*.csv. api enables real public/API adapters.
+  mode: "sample"
+  sample_properties: "data/sample/properties.csv"
+  sample_business_entities: "data/sample/business_entities.csv"
+  sample_sec_matches: "data/sample/sec_matches.csv"
+  sample_contacts: "data/sample/contacts.csv"
 
-  # Property filters
-  min_property_value: 2000000      # Only pull properties assessed at this value or above
+apollo:
+  enabled: true
+  per_page: 25
+  max_pages: 5
+  reveal_contacts: false
+  max_reveals_per_run: 0
+  # Base server-side filters (used when no search_rotation variant is active).
+  filters:
+    person_titles:
+      - "Founder"
+      - "Co-Founder"
+      - "CEO"
+      - "President"
+      - "Managing Partner"
+      - "Partner"
+      - "Owner"
+      - "Chairman"
+      - "Board Member"
+      - "Investor"
+      - "Managing Director"
+      - "Principal"
+      - "Family Office"
+      - "Private Equity"
+      - "Venture Capital"
+  # Server-side employee count: prefer smaller/private companies.
+  employee_count_min: 5
+  employee_count_max: 500
+  # Soft industry targeting — informational only; not added to query.
+  target_industries:
+    - "venture capital"
+    - "private equity"
+    - "investment management"
+    - "family office"
+    - "real estate"
+    - "financial services"
+    - "hedge fund"
+    - "asset management"
+  # Randomise starting page so successive runs surface different candidates.
+  random_page_offset_max: 10
+  # Suppress Apollo IDs surfaced within this many days. 0 = suppress forever.
+  seen_ids_cooldown_days: 30
+  # Search rotation: each run randomly picks one variant and uses its titles.
+  # This cycles through different investor/founder segments across runs.
+  search_rotation:
+    - name: "vc_pe"
+      person_titles:
+        - "Partner"
+        - "Managing Partner"
+        - "Managing Director"
+        - "Investor"
+        - "General Partner"
+        - "Venture Partner"
+        - "Principal"
+        - "Portfolio Manager"
+    - name: "founders"
+      person_titles:
+        - "Founder"
+        - "Co-Founder"
+        - "CEO"
+        - "President"
+        - "Owner"
+        - "Chairman"
+    - name: "family_office"
+      person_titles:
+        - "Family Office"
+        - "Chief Investment Officer"
+        - "Managing Director"
+        - "Wealth Manager"
+        - "Investment Manager"
+        - "Portfolio Manager"
+    - name: "real_estate"
+      person_titles:
+        - "Founder"
+        - "CEO"
+        - "Developer"
+        - "Owner"
+        - "Principal"
+        - "Managing Partner"
+      organization_num_employees_ranges: ["1,10", "11,50", "51,200", "201,500"]
+    - name: "healthcare_saas"
+      person_titles:
+        - "Founder"
+        - "CEO"
+        - "Co-Founder"
+        - "Managing Partner"
+        - "Principal"
+        - "Owner"
+      employee_count_max: 250
+  # Client-side hard exclusion: drop any lead whose title contains these strings.
+  excluded_titles:
+    - "Analyst"
+    - "Associate"
+    - "Intern"
+    - "Designer"
+    - "Recruiter"
+    - "Assistant"
+    - "Coordinator"
+    - "Procurement"
+    - "Purchasing"
+    - "General Purchase"
+    - "Customs"
+    - "Product Designer"
+    - "HR"
+    - "Talent"
+  # Conditional override: keep title if it also contains one of the exceptions.
+  excluded_titles_unless_containing:
+    associate:
+      - "investment"
+      - "investor"
+      - "private equity"
+      - "venture"
+      - "partner"
+  # Client-side: drop candidates from these organizations (substring, case-insensitive).
+  excluded_organizations:
+    - "Microsoft"
+    - "Meta"
+    - "Google"
+    - "Alphabet"
+    - "Apple"
+    - "Amazon"
+    - "Tesla"
+    - "Nvidia"
+    - "OpenAI"
+    - "Breakthrough Energy"
+    - "Hyundai"
+    - "JPMorgan"
+    - "Goldman Sachs"
+    - "Morgan Stanley"
+    - "BlackRock"
+    - "Berkshire Hathaway"
+    - "Vanguard"
+    - "Samsung"
+    - "Toyota"
+    - "Ford Motor"
+    - "General Motors"
+    - "AT&T"
+    - "Verizon"
+    - "Walmart"
+    - "Target"
 
-# --- Lead Scoring Weights (must sum to 100) ---
+attom:
+  enabled: true
+  base_url: "https://api.gateway.attomdata.com/propertyapi/v1.0.0"
+  cache_path: "data/raw/attom_cache.json"
+  lead_addresses_path: "data/input/lead_addresses.csv"
+  max_requests_per_run: 25
+  request_delay_seconds: 0.35
+  retry_attempts: 2
+  retry_backoff_seconds: 1.0
+  min_match_confidence: 0.45
+
+census:
+  enabled: true
+
+sec:
+  enabled: true
+
+signals:
+  tech_keywords:
+    - "ai"
+    - "artificial intelligence"
+    - "machine learning"
+    - "software"
+    - "saas"
+    - "cloud"
+    - "data"
+    - "robotics"
+    - "cybersecurity"
+    - "technology"
+  investor_keywords:
+    - "venture"
+    - "venture capital"
+    - "vc"
+    - "private equity"
+    - "pe"
+    - "family office"
+    - "capital"
+    - "investment"
+    - "investor"
+    - "fund"
+    - "asset management"
+    - "wealth"
+    - "financial"
+  networking_keywords:
+    - "founder"
+    - "co-founder"
+    - "startup"
+    - "accelerator"
+    - "incubator"
+    - "angel"
+    - "advisor"
+    - "board"
+    - "ecosystem"
+  real_estate_keywords:
+    - "real estate"
+    - "realty"
+    - "property"
+    - "properties"
+    - "developer"
+    - "development"
+  healthcare_keywords:
+    - "healthcare"
+    - "health care"
+    - "biotech"
+    - "medical"
+    - "pharma"
+    - "life sciences"
+
 scoring:
   weights:
-    property_value: 25
-    multi_property: 8
-    business_ownership: 20
-    sec_filing_match: 15
-    apollo_title_seniority: 10
-    apollo_company_revenue: 7
-    area_wealth_index: 5
-    phone_reachability: 5
+    property_value: 30
+    multi_property: 10
+    business_ownership: 25
+    sec_filing_match: 10
+    area_wealth_index: 10
+    phone_reachability: 10
     recency_signal: 5
-
-  # Property value scoring brackets
-  property_brackets:
-    - min: 3000000
-      points: 25          # $3M+ = full points
-    - min: 2000000
-      points: 18          # $2M-$3M
-    - min: 1500000
-      points: 10          # $1.5M-$2M
-    - min: 0
-      points: 0
-
-  # Title seniority scoring
-  title_scores:
-    c_suite: 10            # CEO, CFO, CTO, COO, etc.
-    vp_partner: 10         # VP, Managing Partner, Partner
-    director: 7
-    manager: 3
-    other: 0
-
-  # Score tier thresholds
   tiers:
-    hot: 80                # 80-100
-    warm: 60               # 60-79
-    cool: 40               # 40-59
-    skip: 0                # 0-39
+    hot: 80
+    warm: 60
+    cool: 40
+    skip: 0
+  # Inferred affinity bonuses are optional and sit outside the core 100-point model.
+  # Keep small; these are alignment hints, not verified interests.
+  affinity_bonuses:
+    investor_aligned_tags: 3
+    startup_ecosystem_tags: 2
+    vc_pe_family_office_tags: 5
 
-# --- Apollo API Settings ---
-apollo:
-  base_url: "https://api.apollo.io/api/v1"
-  rate_limit_per_minute: 50        # Adjust based on your plan
-  enrich_fields:
-    - "email"
-    - "phone"
-    - "title"
-    - "company"
-    - "linkedin_url"
-    - "seniority"
-    - "company_revenue"
-
-# --- Output Settings ---
 output:
-  format: "xlsx"                   # xlsx or csv
-  color_code_tiers: true           # Color rows by tier in Excel
-  separate_sheets_by_tier: true    # One sheet per tier
-  include_all_fields: true         # Include all enrichment data
   output_dir: "data/output"
+  filename_prefix: "investor_leads"
+  separate_sheets_by_tier: true
+  color_code_tiers: true
+  # Delete workbooks older than the most recent N after each run. 0 = keep all.
+  keep_last_n_workbooks: 10
 
-# --- Pipeline Settings ---
 pipeline:
-  batch_size: 50                   # Records per API batch
-  max_concurrent_requests: 5       # Async concurrency limit
-  retry_attempts: 3                # Retries on API failure
-  retry_delay_seconds: 2           # Delay between retries
-  dedup_by: ["name", "address"]    # Deduplication fields
-  log_level: "INFO"                # DEBUG, INFO, WARNING, ERROR
+  batch_size: 50
+  retry_attempts: 3
+  retry_delay_seconds: 2
+  dedup_by: ["name"]
+  log_level: "INFO"
+  database_path: "data/processed/prospects.db"

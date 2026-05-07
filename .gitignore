@@ -1,10 +1,12 @@
 # Config with secrets
 config/config.yaml
+.env
 
 # Data files
 data/raw/
 data/processed/
 data/output/
+output/
 
 # Python
 __pycache__/

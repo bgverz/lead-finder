@@ -1,0 +1,8 @@
+owner_name,property_address,city,state,zip_code,property_value,owner_type,purchase_date,area_income,area_home_value,source
+Jordan Whitaker,12 Round Hill Road,Greenwich,CT,06831,4250000,individual,2025-03-12,178000,1250000,sample_property_records
+Priya Shah,88 Lake Avenue,Greenwich,CT,06830,2850000,individual,2023-10-04,162000,1180000,sample_property_records
+Marcus Lee,41 Harbor View Drive,Greenwich,CT,06830,2350000,trust,2020-06-20,162000,1180000,sample_property_records
+Elena Rossi,9 Cedar Lane,Westport,CT,06880,1950000,individual,2025-01-22,151000,980000,sample_property_records
+Daniel Kim,100 Ocean Road,Palm Beach,FL,33480,6100000,individual,2024-08-01,169000,1420000,sample_property_records
+Jordan Whitaker,20 Field Point Circle,Greenwich,CT,06830,3100000,individual,2022-04-14,162000,1180000,sample_property_records
+Alex Morgan,3 Valley Road,Stamford,CT,06902,1450000,individual,2025-02-15,91000,620000,sample_property_records
