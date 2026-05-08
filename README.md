@@ -61,6 +61,50 @@ python -m lead_pipeline run --mode api --profile c_suite --limit 50 --open
 
 The `c_suite` profile prioritizes ownership/operator, senior executive, financial decision-maker, and technology operator signals. These are inferred from Apollo title and company metadata, not verified interests or accreditation status.
 
+## Daily Use
+
+> No need to remember CLI commands. Use the scripts below from the project root.
+
+### First-time setup
+
+```bash
+cd ~/Projects/lead-finder
+./scripts/setup_local.sh
+```
+
+This creates the virtual environment, installs dependencies, and copies `.env.example` to `.env`. Edit `.env` and fill in your API keys before running any live searches.
+
+### Every day
+
+```bash
+# 1. Navigate to the project
+cd ~/Projects/lead-finder
+
+# 2. Verify API keys and connectivity
+./scripts/check_setup.sh
+
+# 3. Run a live search (pick one)
+./scripts/run_founders.sh      # founders and operators
+./scripts/run_vc_pe.sh         # VC and PE professionals
+./scripts/run_c_suite.sh       # C-suite executives
+
+# 4. See which leads are worth revealing in Apollo
+./scripts/prepare_reveal.sh
+```
+
+Each script prints the exact command it runs, so you can always see what is happening and copy the command to adjust it manually.
+
+| Script | What it does |
+|--------|-------------|
+| `setup_local.sh` | One-time setup: venv, deps, `.env` |
+| `check_setup.sh` | `doctor --mode api` — checks keys and connectivity |
+| `run_founders.sh` | `run --profile founders --limit 25 --open` |
+| `run_vc_pe.sh` | `run --profile vc_pe --limit 25 --open` |
+| `run_c_suite.sh` | `run --profile c_suite --limit 25 --open` |
+| `prepare_reveal.sh` | `prepare-reveal` — credit estimate for top leads |
+
+All scripts exit with a clear error message if the virtual environment is missing.
+
 ## ATTOM Property Enrichment
 
 ATTOM enrichment uses the trial-compatible address endpoint:
@@ -152,8 +196,14 @@ lead-finder/
 ├── docs/
 │   └── SETUP_REQUIRED.md
 ├── scripts/
-│   ├── setup.sh
-│   ├── setup.ps1
+│   ├── setup_local.sh           # one-time setup
+│   ├── check_setup.sh           # verify API keys / connectivity
+│   ├── run_founders.sh          # daily run — founders profile
+│   ├── run_vc_pe.sh             # daily run — vc_pe profile
+│   ├── run_c_suite.sh           # daily run — c_suite profile
+│   ├── prepare_reveal.sh        # show reveal candidates
+│   ├── setup.sh                 # legacy setup
+│   ├── setup.ps1                # Windows setup
 │   └── test_apollo.py
 ├── requirements.txt
 ├── pytest.ini

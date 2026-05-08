@@ -148,6 +148,7 @@ class LeadPipeline:
         if persist:
             db = LeadDatabase(self.config.pipeline.database_path)
             try:
+                db.apply_stored_statuses(scored)
                 db.upsert_many(scored)
             finally:
                 db.close()
@@ -297,6 +298,7 @@ class LeadPipeline:
                     apollo_has_email=person.has_email,
                     apollo_has_direct_phone=person.has_direct_phone,
                     apollo_obfuscated=person.is_obfuscated,
+                    apollo_search_profile=self.config.apollo.active_profile,
                 )
             )
         return leads

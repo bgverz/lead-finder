@@ -163,6 +163,10 @@ class Lead:
     apollo_has_email: bool = False
     apollo_has_direct_phone: bool = False
     apollo_obfuscated: bool = False
+    lead_status: str = "new"
+    status_updated_at: str = ""
+    status_notes: str = ""
+    apollo_search_profile: str = ""
     interest_tags: list[str] = field(default_factory=list)
     tech_signal: bool = False
     investor_signal: bool = False
@@ -365,6 +369,33 @@ class Lead:
             return "Medium"
         return "Low"
 
+    @property
+    def contact_quality(self) -> str:
+        """Contact completeness: 'full' (email+phone), 'partial' (one or flags only), 'none'."""
+        has_real_email = bool(self.email and not self.apollo_obfuscated)
+        has_real_phone = self.phone_valid and bool(self.phone) and not self.apollo_obfuscated
+        if has_real_email and has_real_phone:
+            return "full"
+        if has_real_email or has_real_phone or self.apollo_has_email or self.apollo_has_direct_phone:
+            return "partial"
+        return "none"
+
+    @property
+    def contact_reveal_priority(self) -> str:
+        """Priority for spending Apollo reveal credits: 'high', 'medium', 'low', or 'skip'."""
+        if not self.apollo_person_id or not self.apollo_obfuscated:
+            return "skip"
+        if self.contact_quality == "full":
+            return "skip"
+        if self.lead_score < 40:
+            return "skip"
+        tier = apollo_title_tier(self.apollo_title or "")
+        if self.lead_score >= 65 and tier in ("top", "high"):
+            return "high"
+        if self.lead_score >= 45:
+            return "medium"
+        return "low"
+
     def _phone_summary_phrase(self) -> str:
         if not self.phone_valid or not self.phone:
             return ""
@@ -433,6 +464,12 @@ class Lead:
             "apollo_has_email": self.apollo_has_email,
             "apollo_has_direct_phone": self.apollo_has_direct_phone,
             "apollo_obfuscated": self.apollo_obfuscated,
+            "contact_quality": self.contact_quality,
+            "contact_reveal_priority": self.contact_reveal_priority,
+            "lead_status": self.lead_status,
+            "status_updated_at": self.status_updated_at,
+            "status_notes": self.status_notes,
+            "apollo_search_profile": self.apollo_search_profile,
             "owner_type": self.owner_type,
             "city": self.city,
             "state": self.state,

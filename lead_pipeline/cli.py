@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from lead_pipeline.enrichment.apollo import ApolloClient
 from lead_pipeline.pipeline import LeadPipeline
+from lead_pipeline.utils.database import LeadDatabase, VALID_STATUSES
 from lead_pipeline.utils.config import (
     Config,
     load_config,
@@ -119,8 +120,7 @@ def run(
     click.echo(f"Workbook: {workbook}")
     click.echo(f"Tiers: {counts}")
 
-    if normalize_mode(mode) == "api":
-        _print_api_run_summary(leads, config, workbook)
+    _print_run_summary(leads, config, workbook, mode)
 
     if open_after:
         _open_file(Path(workbook))
@@ -283,6 +283,186 @@ def open_latest(config_path: str) -> None:
     latest = max(candidates, key=lambda p: p.stat().st_mtime)
     click.echo(f"Opening: {latest}")
     _open_file(latest)
+
+
+@main.command("prepare-reveal")
+@click.option("--config", "config_path", default="", help="Path to YAML config.")
+@click.option("--min-score", type=float, default=45.0, show_default=True, help="Minimum score to consider.")
+@click.option("--limit", type=int, default=25, show_default=True, help="Max leads to display.")
+def prepare_reveal(config_path: str, min_score: float, limit: int) -> None:
+    """Show top Apollo leads worth revealing and estimate credit cost."""
+
+    load_local_env()
+    try:
+        config = load_runtime_config(config_path)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    db = LeadDatabase(config.pipeline.database_path)
+    try:
+        candidates = db.load_reveal_candidates(min_score=min_score)
+    finally:
+        db.close()
+
+    if not candidates:
+        click.echo(f"No leads with score >= {min_score:.0f} in the database.")
+        click.echo("Run the pipeline first: python -m lead_pipeline run")
+        return
+
+    apollo_obfuscated = [r for r in candidates if r.get("apollo_obfuscated") and r.get("apollo_person_id")]
+    non_apollo = [r for r in candidates if not r.get("apollo_person_id")]
+    needs_address = [r for r in candidates if r.get("address_needed")]
+
+    high = [r for r in apollo_obfuscated if r.get("contact_reveal_priority") == "high"]
+    medium = [r for r in apollo_obfuscated if r.get("contact_reveal_priority") == "medium"]
+    low = [r for r in apollo_obfuscated if r.get("contact_reveal_priority") == "low"]
+    recommended = len(high) + len(medium)
+
+    click.echo("")
+    click.echo("─" * 62)
+    click.echo("  Reveal Candidates  (Apollo credits required)")
+    click.echo("─" * 62)
+    click.echo(f"  High priority   : {len(high):>4}  (~{len(high)} credits)")
+    click.echo(f"  Medium priority : {len(medium):>4}  (~{len(medium)} credits)")
+    click.echo(f"  Low priority    : {len(low):>4}  (review first)")
+    click.echo(f"  Non-Apollo leads: {len(non_apollo):>4}  (find contact externally)")
+    click.echo(f"  Address needed  : {len(needs_address):>4}  (export to get address)")
+    click.echo("")
+    click.echo(f"  Recommended: reveal high + medium = ~{recommended} credits")
+    click.echo("")
+
+    to_show = (high + medium)[:limit]
+    if to_show:
+        click.echo("  Leads to reveal (high → medium, by score):")
+        for row in to_show:
+            name = row.get("name", "Unknown")
+            score = float(row.get("lead_score") or 0)
+            tier = row.get("score_tier", "")
+            title = row.get("apollo_title", "")
+            org = row.get("apollo_organization", "")
+            priority = (row.get("contact_reveal_priority") or "").upper()
+            status = row.get("_db_lead_status", "new")
+            profile = row.get("apollo_search_profile", "")
+            click.echo(f"  • [{priority}] {name}  {score:.0f} ({tier})")
+            role = " @ ".join(p for p in [title, org] if p)
+            if role:
+                click.echo(f"      Role    : {role}")
+            if profile:
+                click.echo(f"      Profile : {profile}")
+            click.echo(f"      Status  : {status}")
+    click.echo("─" * 62)
+
+
+@main.command("compare-profiles")
+@click.option("--config", "config_path", default="", help="Path to YAML config.")
+def compare_profiles(config_path: str) -> None:
+    """Compare Apollo search profile effectiveness from the database."""
+
+    load_local_env()
+    try:
+        config = load_runtime_config(config_path)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    db = LeadDatabase(config.pipeline.database_path)
+    try:
+        stats = db.load_profile_stats()
+    finally:
+        db.close()
+
+    if not stats:
+        click.echo("No leads in the database yet.")
+        click.echo("Run: python -m lead_pipeline run --profile <name>")
+        return
+
+    click.echo("")
+    click.echo("─" * 70)
+    click.echo("  Profile Comparison  (from database)")
+    click.echo(f"  {'Profile':<22} {'Total':>5} {'Avg':>6}  {'Hot':>4} {'Warm':>4} {'Cool':>4} {'Skip':>4}  {'Hot%':>5}")
+    click.echo("─" * 70)
+    for row in stats:
+        total = row["total"] or 0
+        hot_pct = f"{row['hot'] / total * 100:.0f}%" if total > 0 else "—"
+        click.echo(
+            f"  {row['profile']:<22} {total:>5} {row['avg_score']:>6.1f}"
+            f"  {row['hot']:>4} {row['warm']:>4} {row['cool']:>4} {row['skip_count']:>4}"
+            f"  {hot_pct:>5}"
+        )
+    click.echo("─" * 70)
+    click.echo("  Tip: python -m lead_pipeline run --profile <name>  to populate a profile.")
+    click.echo("")
+
+
+@main.command("import-feedback")
+@click.argument("csv_path", type=click.Path(exists=True))
+@click.option("--config", "config_path", default="", help="Path to YAML config.")
+@click.option("--dry-run", is_flag=True, help="Preview without writing to the database.")
+def import_feedback(csv_path: str, config_path: str, dry_run: bool) -> None:
+    """Import lead status updates from a CSV file.
+
+    \b
+    Required CSV columns : name, status
+    Optional CSV columns : property_address, notes
+    Valid status values  : new, revealed, contacted, skipped, converted, do_not_contact
+    """
+    import csv as _csv
+
+    load_local_env()
+    try:
+        config = load_runtime_config(config_path)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    rows: list[dict] = []
+    parse_errors: list[str] = []
+
+    with open(csv_path, newline="", encoding="utf-8") as fh:
+        reader = _csv.DictReader(fh)
+        for i, row in enumerate(reader, start=2):
+            name = (row.get("name") or "").strip()
+            status = (row.get("status") or "").strip().lower()
+            if not name:
+                parse_errors.append(f"Row {i}: missing 'name'")
+                continue
+            if not status:
+                parse_errors.append(f"Row {i}: missing 'status' for '{name}'")
+                continue
+            if status not in VALID_STATUSES:
+                parse_errors.append(
+                    f"Row {i}: invalid status '{status}' for '{name}' "
+                    f"— valid: {', '.join(sorted(VALID_STATUSES))}"
+                )
+                continue
+            rows.append(row)
+
+    if parse_errors:
+        click.echo("Validation errors:")
+        for err in parse_errors:
+            click.echo(f"  {err}")
+
+    if not rows:
+        raise click.ClickException("No valid rows to import.")
+
+    click.echo(f"Found {len(rows)} valid feedback row(s).")
+
+    if dry_run:
+        click.echo("[dry-run] No changes written. Preview:")
+        for row in rows[:10]:
+            click.echo(f"  {row.get('name')} → {row.get('status')}"
+                       + (f"  ({row.get('notes')})" if row.get("notes") else ""))
+        if len(rows) > 10:
+            click.echo(f"  … and {len(rows) - 10} more")
+        return
+
+    db = LeadDatabase(config.pipeline.database_path)
+    try:
+        updated, not_found = db.import_feedback(rows)
+    finally:
+        db.close()
+
+    click.echo(f"Updated : {updated} lead(s)")
+    if not_found:
+        click.echo(f"Not found: {not_found} row(s) — run the pipeline first to populate the database")
 
 
 def load_local_env() -> None:
@@ -471,80 +651,85 @@ def _print_apollo_query_preview(config: "Config") -> None:
     click.echo("")
 
 
-def _print_api_run_summary(leads: list, config: "Config", workbook: str) -> None:
-    """Print an enriched summary for api-mode runs."""
+def _print_run_summary(leads: list, config: "Config", workbook: str, mode: str = "mock") -> None:
+    """Print a run summary with tier breakdown, contact quality, and reveal-credit estimate."""
     from collections import Counter
 
+    is_api = normalize_mode(mode) == "api"
     click.echo("")
-    click.echo("─" * 56)
-    click.echo("  API Run Summary")
-    click.echo("─" * 56)
+    click.echo("═" * 60)
+    click.echo("  Run Summary")
+    click.echo("═" * 60)
 
-    apollo_count = sum(1 for lead in leads if lead.apollo_person_id)
-    recycled_count = sum(
-        1 for lead in leads if "apollo_recycled" in (lead.source_notes or "")
-    )
-    fresh_count = apollo_count - recycled_count
-    candidate_detail = f"{fresh_count} fresh" + (f", {recycled_count} recycled" if recycled_count else "")
-    click.echo(f"  Apollo candidates : {apollo_count} ({candidate_detail})")
+    # --- Tier breakdown ---
+    tier_counts: Counter = Counter(lead.score_tier for lead in leads)
+    click.echo(f"  Total leads  : {len(leads)}")
+    for tier in ("Hot", "Warm", "Cool", "Skip"):
+        click.echo(f"    {tier:<8}: {tier_counts.get(tier, 0)}")
 
-    enrichments_on: list[str] = []
-    enrichments_off: list[str] = []
-    if config.apollo.enabled and config.api_keys.apollo:
-        enrichments_on.append("Apollo")
-    else:
-        enrichments_off.append("Apollo (off)")
-    if config.census.enabled and config.api_keys.census:
-        enrichments_on.append("Census")
-    else:
-        enrichments_off.append("Census (off)")
-    if config.sec.enabled:
-        enrichments_on.append("SEC EDGAR")
-    else:
-        enrichments_off.append("SEC (off)")
-    if config.api_keys.numverify or config.api_keys.abstractapi:
-        enrichments_on.append("Phone")
-    else:
-        enrichments_off.append("Phone (off)")
-    if config.api_keys.attom:
-        enrichments_on.append("ATTOM")
-    if config.api_keys.opencorporates:
-        enrichments_on.append("OpenCorp")
+    # --- Contact quality ---
+    quality_counts: Counter = Counter(lead.contact_quality for lead in leads)
+    click.echo("")
+    click.echo("  Contact quality:")
+    click.echo(f"    Full        : {quality_counts.get('full', 0)}  (email + phone ready)")
+    click.echo(f"    Partial     : {quality_counts.get('partial', 0)}  (one channel or flags only)")
+    click.echo(f"    None        : {quality_counts.get('none', 0)}  (no contact info)")
 
-    click.echo(f"  Enabled           : {', '.join(enrichments_on) or 'none'}")
-    if enrichments_off:
-        click.echo(f"  Skipped           : {', '.join(enrichments_off)}")
+    # --- Reveal credit estimate ---
+    high_rev = [l for l in leads if l.contact_reveal_priority == "high"]
+    med_rev = [l for l in leads if l.contact_reveal_priority == "medium"]
+    low_rev = [l for l in leads if l.contact_reveal_priority == "low"]
+    recommended_credits = len(high_rev) + len(med_rev)
+    click.echo("")
+    click.echo("  Apollo reveal (credits):")
+    click.echo(f"    High        : {len(high_rev)}  (reveal now)")
+    click.echo(f"    Medium      : {len(med_rev)}  (review, then reveal)")
+    click.echo(f"    Low         : {len(low_rev)}  (skip or research first)")
+    click.echo(f"    Recommended : ~{recommended_credits} credits  (high + medium)")
 
-    action_counts: Counter = Counter(lead.next_action for lead in leads)
-    click.echo(f"  Next actions      : {dict(action_counts)}")
-    property_enriched = sum(1 for lead in leads if lead.property_match_confidence > 0)
-    if config.api_keys.attom:
-        click.echo(f"  ATTOM matches     : {property_enriched} enriched lead(s)")
-        if property_enriched == 0:
-            click.echo("                       No usable addresses found in this run; ATTOM address lookups skipped safely.")
+    # --- Address / lookup status ---
+    addr_needed = sum(1 for l in leads if l.address_needed)
+    if addr_needed:
+        click.echo("")
+        click.echo(f"  Address needed  : {addr_needed} lead(s) — export to get address for ATTOM lookup")
 
-    # Top-leads preview (up to 5, sorted by score desc).
-    top = sorted(leads, key=lambda ld: ld.lead_score, reverse=True)[:5]
+    # --- API-mode extras ---
+    if is_api:
+        apollo_count = sum(1 for l in leads if l.apollo_person_id)
+        recycled = sum(1 for l in leads if "apollo_recycled" in (l.source_notes or ""))
+        if apollo_count:
+            fresh = apollo_count - recycled
+            detail = f"{fresh} fresh" + (f", {recycled} recycled" if recycled else "")
+            click.echo("")
+            click.echo(f"  Apollo leads    : {apollo_count} ({detail})")
+
+        if config.apollo.active_profile:
+            click.echo(f"  Profile used    : {config.apollo.active_profile}")
+
+        prop_enriched = sum(1 for l in leads if l.property_match_confidence > 0)
+        if config.api_keys.attom:
+            click.echo(f"  ATTOM matches   : {prop_enriched}")
+
+    # --- Top leads preview ---
+    top = sorted(leads, key=lambda l: l.lead_score, reverse=True)[:5]
     if top:
         click.echo("")
         click.echo("  Top leads:")
         for lead in top:
-            identity = lead.name or "Unknown"
             score_info = f"{lead.lead_score:.0f} ({lead.score_tier})"
             role_parts = [p for p in (lead.apollo_title, lead.apollo_organization) if p]
             role = " @ ".join(role_parts) if role_parts else ""
-            action = lead.next_action
-            summary_short = lead.lead_summary.split(";")[0].rstrip(".")
-            click.echo(f"  • {identity}")
-            click.echo(f"      Score   : {score_info}")
+            click.echo(f"  • {lead.name or 'Unknown'}  {score_info}")
             if role:
                 click.echo(f"      Role    : {role}")
-            click.echo(f"      Action  : {action}")
-            click.echo(f"      Summary : {summary_short}")
+            click.echo(f"      Action  : {lead.next_action}")
+            click.echo(f"      Contact : {lead.contact_quality} / reveal={lead.contact_reveal_priority}")
 
     click.echo("")
     click.echo(f"  Workbook : {workbook}")
-    click.echo("─" * 56)
+    if recommended_credits:
+        click.echo(f"  Next     : python -m lead_pipeline prepare-reveal")
+    click.echo("═" * 60)
 
 
 def _open_file(path: Path) -> None:
