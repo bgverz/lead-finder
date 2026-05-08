@@ -16,6 +16,12 @@ logger = setup_logger("enrichment.apollo")
 APOLLO_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_people/api_search"
 APOLLO_REVEAL_URL_TEMPLATE = "https://api.apollo.io/api/v1/people/{person_id}"
 
+# Country name variants that map to ISO "US".
+_US_COUNTRY_NAMES: frozenset[str] = frozenset({
+    "us", "usa", "united states", "united states of america",
+    "u.s.", "u.s.a.", "u.s",
+})
+
 # Apollo employee-count range labels in ascending order.
 _EMPLOYEE_RANGE_BUCKETS: list[tuple[int, int | None, str]] = [
     (1, 10, "1,10"),
@@ -234,6 +240,11 @@ class ApolloClient:
                 if ranges:
                     payload["organization_num_employees_ranges"] = ranges
 
+        # Server-side country filter — always applied when countries is non-empty.
+        countries = [c.upper() for c in (self.config.targeting.countries or []) if c.strip()]
+        if countries:
+            payload["person_country_codes"] = countries
+
         return payload
 
     def _select_rotation_variant(self) -> dict[str, Any] | None:
@@ -281,6 +292,7 @@ class ApolloClient:
             "seen_filtered": 0,
             "title_filtered": 0,
             "org_filtered": 0,
+            "geo_filtered": 0,
         }
 
         # 1. Skip previously-seen IDs.
@@ -316,6 +328,19 @@ class ApolloClient:
                     stats["org_filtered"],
                 )
 
+        # 4. Client-side country/geo filter (fallback safety net after server-side filter).
+        target_codes = [c.upper() for c in (self.config.targeting.countries or []) if c.strip()]
+        if target_codes:
+            before = len(people)
+            people = [p for p in people if self._is_target_country(p, target_codes)]
+            stats["geo_filtered"] = before - len(people)
+            if stats["geo_filtered"]:
+                logger.warning(
+                    "Apollo geo filter: dropped %d non-%s candidate(s) that slipped past server-side filter.",
+                    stats["geo_filtered"],
+                    "/".join(target_codes),
+                )
+
         return people, stats
 
     def _is_excluded_title(self, title: str) -> bool:
@@ -338,9 +363,25 @@ class ApolloClient:
         org_lower = org_name.lower()
         return any(excl.lower() in org_lower for excl in self.config.apollo.excluded_organizations)
 
+    def _is_target_country(self, person: ApolloPerson, target_codes: list[str]) -> bool:
+        """Client-side country check. Empty country field → pass through (server filter is primary)."""
+        if not target_codes:
+            return True  # geo filtering disabled
+        raw_country = person.country.strip()
+        if not raw_country:
+            return True  # no country data — server-side filter is the primary guard
+        country_upper = raw_country.upper()
+        if country_upper in target_codes:
+            return True
+        # Handle long-form names (e.g. "United States")
+        if raw_country.lower() in _US_COUNTRY_NAMES and "US" in target_codes:
+            return True
+        return False
+
     def _log_query_info(self, payload: dict[str, Any], start_page: int) -> None:
         titles = payload.get("person_titles") or []
         emp_ranges = payload.get("organization_num_employees_ranges") or []
+        country_codes = payload.get("person_country_codes") or []
         excluded_orgs = self.config.apollo.excluded_organizations
         profile_tag = (
             f" [profile: {self.config.apollo.active_profile}]"
@@ -354,6 +395,11 @@ class ApolloClient:
             ", ".join(titles[:4]) + ("…" if len(titles) > 4 else "") if titles else "any",
             ", ".join(emp_ranges) if emp_ranges else "any",
         )
+        if country_codes:
+            logger.info(
+                "Apollo geography filter: %s only (server-side + client-side fallback)",
+                "/".join(country_codes),
+            )
         if excluded_orgs:
             logger.info(
                 "Apollo org exclusions (%d): %s",

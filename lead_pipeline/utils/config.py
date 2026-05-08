@@ -31,6 +31,9 @@ class TargetingConfig:
     min_median_income: int = 100_000
     min_median_home_value: int = 750_000
     min_property_value: int = 2_000_000
+    # ISO 3166-1 alpha-2 country codes for Apollo server-side + client-side geo filter.
+    # Defaults to US-only. Set to [] to disable country filtering.
+    countries: list[str] = field(default_factory=lambda: ["US"])
 
 
 @dataclass

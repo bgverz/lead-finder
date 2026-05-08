@@ -280,6 +280,7 @@ class LeadPipeline:
                     property_address="",
                     city=person.city,
                     state=person.state,
+                    country=getattr(person, "country", ""),
                     owner_type="apollo_person",
                     sec_match=sec_match,
                     sec_details=sec_details,

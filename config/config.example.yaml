@@ -19,6 +19,10 @@ targeting:
   min_median_income: 100000
   min_median_home_value: 750000
   min_property_value: 1500000
+  # ISO 3166-1 alpha-2 country codes. Applied server-side to Apollo searches
+  # and as a client-side fallback. Default: US only. Set to [] to disable.
+  countries:
+    - US
 
 sources:
   # sample runs fully offline using data/sample/*.csv. api enables real public/API adapters.

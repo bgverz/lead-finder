@@ -137,6 +137,7 @@ class Lead:
     city: str = ""
     state: str = ""
     zip_code: str = ""
+    country: str = ""
     owner_type: str = "individual"
     purchase_date: date | None = None
     business_entities: list[BusinessEntity] = field(default_factory=list)
@@ -474,6 +475,7 @@ class Lead:
             "city": self.city,
             "state": self.state,
             "zip_code": self.zip_code,
+            "country": self.country,
             "property_count": self.property_count,
             "area_home_value": self.area_home_value,
             "email": self.email,

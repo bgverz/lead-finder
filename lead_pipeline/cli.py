@@ -633,6 +633,12 @@ def _print_apollo_query_preview(config: "Config") -> None:
             ranges = _build_employee_ranges(emp_min, emp_max)
             click.echo(f"  Employee range     : {emp_min or 'any'}–{emp_max or 'any'} → {', '.join(ranges)}")
 
+    countries = config.targeting.countries or []
+    if countries:
+        click.echo(f"  Geography          : {', '.join(c.upper() for c in countries)} only (server-side + client-side)")
+    else:
+        click.echo("  Geography          : no country filter configured")
+
     if apollo.excluded_organizations:
         n = len(apollo.excluded_organizations)
         sample = ", ".join(apollo.excluded_organizations[:5])
