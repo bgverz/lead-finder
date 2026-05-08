@@ -1,11 +1,11 @@
 from click.testing import CliRunner
 
 from lead_pipeline.cli import main
-from src.enrichment.apollo import ApolloClient
-from src.models import Lead
-from src.scoring.scorer import LeadScorer
-from src.utils.config import load_config
-from src.utils.profiles import get_profile, list_profiles
+from lead_pipeline.enrichment.apollo import ApolloClient
+from lead_pipeline.models import Lead
+from lead_pipeline.scoring.scorer import LeadScorer
+from lead_pipeline.utils.config import load_config
+from lead_pipeline.utils.profiles import get_profile, list_profiles
 
 
 class _FakeResponse:

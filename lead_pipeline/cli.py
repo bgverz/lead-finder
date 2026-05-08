@@ -14,9 +14,9 @@ from tempfile import TemporaryDirectory
 import click
 from dotenv import load_dotenv
 
-from src.enrichment.apollo import ApolloClient
-from src.pipeline import LeadPipeline
-from src.utils.config import (
+from lead_pipeline.enrichment.apollo import ApolloClient
+from lead_pipeline.pipeline import LeadPipeline
+from lead_pipeline.utils.config import (
     Config,
     load_config,
     missing_api_mode_setup,
@@ -400,7 +400,7 @@ def _mock_pipeline_probe(config: Config) -> bool:
 
 def _apply_search_profile(config: "Config", profile_name: str) -> None:
     """Overlay a built-in search profile onto the apollo config section."""
-    from src.utils.profiles import get_profile, list_profiles
+    from lead_pipeline.utils.profiles import get_profile, list_profiles
 
     try:
         get_profile(profile_name)  # validate before mutating config
@@ -415,8 +415,8 @@ def _apply_search_profile(config: "Config", profile_name: str) -> None:
 
 def _print_apollo_query_preview(config: "Config") -> None:
     """Print Apollo search parameters before the run starts."""
-    from src.enrichment.apollo import _build_employee_ranges
-    from src.utils.profiles import get_profile
+    from lead_pipeline.enrichment.apollo import _build_employee_ranges
+    from lead_pipeline.utils.profiles import get_profile
 
     apollo = config.apollo
     click.echo("")

@@ -7,9 +7,12 @@ data/raw/
 data/processed/
 data/output/
 output/
+*.xlsx
+*.log
 
 # Python
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 *.egg-info/

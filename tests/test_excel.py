@@ -2,9 +2,9 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from src.models import Lead
-from src.output.excel import OUTPUT_COLUMNS, ExcelExporter
-from src.utils.config import load_config
+from lead_pipeline.models import Lead
+from lead_pipeline.output.excel import OUTPUT_COLUMNS, ExcelExporter
+from lead_pipeline.utils.config import load_config
 
 
 def test_excel_export_creates_tier_sheets(tmp_path: Path):

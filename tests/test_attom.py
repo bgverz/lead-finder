@@ -1,10 +1,10 @@
 from types import SimpleNamespace
 
-from src.enrichment.attom import ATTOMClient
-from src.models import Lead
-from src.pipeline import LeadPipeline
-from src.scoring.scorer import LeadScorer
-from src.utils.config import load_config
+from lead_pipeline.enrichment.attom import ATTOMClient
+from lead_pipeline.models import Lead
+from lead_pipeline.pipeline import LeadPipeline
+from lead_pipeline.scoring.scorer import LeadScorer
+from lead_pipeline.utils.config import load_config
 
 
 class FakeResponse:
@@ -51,7 +51,7 @@ def test_attom_address_lookup_uses_apikey_header_and_maps_fields(monkeypatch, tm
         captured.update({"url": url, "headers": headers, "params": params, "timeout": timeout})
         return FakeResponse(_attom_payload())
 
-    monkeypatch.setattr("src.enrichment.attom.requests.get", fake_get)
+    monkeypatch.setattr("lead_pipeline.enrichment.attom.requests.get", fake_get)
     client = ATTOMClient(config)
     lead = Lead(name="Avery Stone", property_value=0, property_address="12 Round Hill Road")
 
@@ -73,7 +73,7 @@ def test_attom_enrichment_updates_lead_and_scoring(monkeypatch, tmp_path):
     config.api_keys.attom = "attom-key"
     config.attom.cache_path = str(tmp_path / "attom_cache.json")
     monkeypatch.setattr(
-        "src.enrichment.attom.requests.get",
+        "lead_pipeline.enrichment.attom.requests.get",
         lambda url, headers, params, timeout: FakeResponse(_attom_payload()),
     )
     lead = Lead(
@@ -148,7 +148,7 @@ def test_attom_loads_csv_address_by_company_then_runs_lookup(monkeypatch, tmp_pa
         captured.update({"params": params})
         return FakeResponse(_attom_payload(owner="Avery Stone"))
 
-    monkeypatch.setattr("src.enrichment.attom.requests.get", fake_get)
+    monkeypatch.setattr("lead_pipeline.enrichment.attom.requests.get", fake_get)
     lead = Lead(
         name="Avery S.",
         property_value=0,
@@ -197,10 +197,10 @@ def test_pipeline_runs_attom_enrichment_for_apollo_org_address(monkeypatch, tmp_
         has_full_name=False,
         display_name="Avery S.",
     )
-    monkeypatch.setattr("src.pipeline.ApolloClient.search_people", lambda self, seen_ids=None: [person])
-    monkeypatch.setattr("src.pipeline.SECEdgarMatcher.match", lambda self, q: (False, []))
+    monkeypatch.setattr("lead_pipeline.pipeline.ApolloClient.search_people", lambda self, seen_ids=None: [person])
+    monkeypatch.setattr("lead_pipeline.pipeline.SECEdgarMatcher.match", lambda self, q: (False, []))
     monkeypatch.setattr(
-        "src.enrichment.attom.requests.get",
+        "lead_pipeline.enrichment.attom.requests.get",
         lambda url, headers, params, timeout: FakeResponse(_attom_payload(owner="Avery Stone Ventures")),
     )
 

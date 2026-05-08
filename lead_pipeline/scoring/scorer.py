@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from src.models import Lead, apollo_title_tier
-from src.scoring.signals import apply_affinity_signals
-from src.utils.config import Config
+from lead_pipeline.models import Lead, apollo_title_tier
+from lead_pipeline.scoring.signals import apply_affinity_signals
+from lead_pipeline.utils.config import Config
 
 # Points awarded per title tier (out-of-band from the 100-pt weight budget).
 _TITLE_TIER_POINTS: dict[str, int] = {

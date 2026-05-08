@@ -1,8 +1,8 @@
 from datetime import date
 
-from src.models import BusinessEntity, Lead
-from src.scoring.scorer import LeadScorer
-from src.utils.config import load_config
+from lead_pipeline.models import BusinessEntity, Lead
+from lead_pipeline.scoring.scorer import LeadScorer
+from lead_pipeline.utils.config import load_config
 
 
 def _scored_sample_lead() -> Lead:

@@ -16,9 +16,9 @@ from typing import Any
 
 import requests
 
-from src.models import Lead
-from src.utils.config import Config
-from src.utils.logger import setup_logger
+from lead_pipeline.models import Lead
+from lead_pipeline.utils.config import Config
+from lead_pipeline.utils.logger import setup_logger
 
 logger = setup_logger("enrichment.attom")
 

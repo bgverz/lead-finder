@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.models import Lead
+from lead_pipeline.models import Lead
 
 
 class LeadDatabase:

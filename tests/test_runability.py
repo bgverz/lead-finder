@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 
 from lead_pipeline.cli import apply_mode, load_local_env
-from src.pipeline import LeadPipeline
-from src.utils.config import load_config
+from lead_pipeline.pipeline import LeadPipeline
+from lead_pipeline.utils.config import load_config
 
 
 def test_env_loading_from_dotenv(tmp_path: Path, monkeypatch):

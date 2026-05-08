@@ -8,9 +8,9 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from src.utils.config import Config
-from src.utils.logger import setup_logger
-from src.utils.rate_limiter import RateLimiter
+from lead_pipeline.utils.config import Config
+from lead_pipeline.utils.logger import setup_logger
+from lead_pipeline.utils.rate_limiter import RateLimiter
 
 logger = setup_logger("collectors.sec_edgar")
 

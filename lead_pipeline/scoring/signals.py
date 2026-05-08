@@ -6,8 +6,8 @@ metadata and lead summary text. They are not verified interests.
 
 from __future__ import annotations
 
-from src.models import Lead
-from src.utils.config import Config
+from lead_pipeline.models import Lead
+from lead_pipeline.utils.config import Config
 
 
 def apply_affinity_signals(lead: Lead, config: Config) -> Lead:

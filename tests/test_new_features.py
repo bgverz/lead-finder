@@ -8,10 +8,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.enrichment.apollo import ApolloClient
-from src.models import Lead
-from src.scoring.scorer import LeadScorer
-from src.utils.config import load_config
+from lead_pipeline.enrichment.apollo import ApolloClient
+from lead_pipeline.models import Lead
+from lead_pipeline.scoring.scorer import LeadScorer
+from lead_pipeline.utils.config import load_config
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ def test_doctor_sec_user_agent_real_value(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_census_skips_unknown_state_without_crashing(monkeypatch):
-    from src.collectors.census import CensusClient
+    from lead_pipeline.collectors.census import CensusClient
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
 
@@ -225,7 +225,7 @@ def test_census_skips_unknown_state_without_crashing(monkeypatch):
 def test_census_county_query_uses_in_state_param(monkeypatch):
     """County queries must use for=county:*&in=state:XX (reliably supported by Census API)."""
     import requests as req
-    from src.collectors.census import CensusClient
+    from lead_pipeline.collectors.census import CensusClient
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -254,7 +254,7 @@ def test_census_county_query_uses_in_state_param(monkeypatch):
 def test_census_county_query_filters_by_wealth_threshold(monkeypatch):
     """Only counties meeting income or home-value threshold are returned."""
     import requests as req
-    from src.collectors.census import CensusClient
+    from lead_pipeline.collectors.census import CensusClient
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -286,7 +286,7 @@ def test_census_county_query_filters_by_wealth_threshold(monkeypatch):
 def test_census_continues_after_per_state_http_error(monkeypatch):
     """A per-state failure skips that state and continues with others."""
     import requests as req
-    from src.collectors.census import CensusClient
+    from lead_pipeline.collectors.census import CensusClient
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -324,7 +324,7 @@ def test_census_continues_after_per_state_http_error(monkeypatch):
 def test_census_returns_empty_on_http_failure(monkeypatch):
     """A failed request returns [] without raising."""
     import requests as req
-    from src.collectors.census import CensusClient
+    from lead_pipeline.collectors.census import CensusClient
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -414,8 +414,8 @@ def test_apollo_no_excluded_titles_keeps_all(monkeypatch):
 
 def test_sec_retries_on_500_and_returns_false_after_exhaustion(monkeypatch):
     import requests as req
-    from src.collectors.sec_edgar import SECEdgarMatcher
-    from src.utils.config import load_config
+    from lead_pipeline.collectors.sec_edgar import SECEdgarMatcher
+    from lead_pipeline.utils.config import load_config
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -446,7 +446,7 @@ def test_sec_retries_on_500_and_returns_false_after_exhaustion(monkeypatch):
 
 def test_sec_succeeds_on_third_attempt(monkeypatch):
     import requests as req
-    from src.collectors.sec_edgar import SECEdgarMatcher
+    from lead_pipeline.collectors.sec_edgar import SECEdgarMatcher
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -482,7 +482,7 @@ def test_sec_succeeds_on_third_attempt(monkeypatch):
 def test_sec_non_retryable_error_skips_immediately(monkeypatch):
     """Non-5xx errors (e.g. unexpected exception) skip without all 3 retries."""
     import requests as req
-    from src.collectors.sec_edgar import SECEdgarMatcher
+    from lead_pipeline.collectors.sec_edgar import SECEdgarMatcher
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -510,7 +510,7 @@ def test_sec_non_retryable_error_skips_immediately(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_top_title_scores_higher_than_high_title():
-    from src.scoring.scorer import LeadScorer, _TITLE_TIER_POINTS
+    from lead_pipeline.scoring.scorer import LeadScorer, _TITLE_TIER_POINTS
     config = load_config("config/config.example.yaml")
     scorer = LeadScorer(config)
 
@@ -530,7 +530,7 @@ def test_top_title_scores_higher_than_high_title():
 
 def test_strong_apollo_lead_can_reach_warm_tier():
     """Founder + org + email flag + phone flag + SEC → enough for Warm (≥60)."""
-    from src.scoring.scorer import LeadScorer
+    from lead_pipeline.scoring.scorer import LeadScorer
     config = load_config("config/config.example.yaml")
     scorer = LeadScorer(config)
     lead = Lead(
@@ -551,7 +551,7 @@ def test_strong_apollo_lead_can_reach_warm_tier():
 
 
 def test_weak_apollo_title_stays_skip():
-    from src.scoring.scorer import LeadScorer
+    from lead_pipeline.scoring.scorer import LeadScorer
     config = load_config("config/config.example.yaml")
     scorer = LeadScorer(config)
     lead = Lead(
@@ -653,7 +653,7 @@ def test_open_latest_selects_newest_xlsx(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_build_employee_ranges_bounded():
-    from src.enrichment.apollo import _build_employee_ranges
+    from lead_pipeline.enrichment.apollo import _build_employee_ranges
     ranges = _build_employee_ranges(5, 500)
     assert "1,10" in ranges
     assert "201,500" in ranges
@@ -662,7 +662,7 @@ def test_build_employee_ranges_bounded():
 
 
 def test_build_employee_ranges_no_upper_bound():
-    from src.enrichment.apollo import _build_employee_ranges
+    from lead_pipeline.enrichment.apollo import _build_employee_ranges
     ranges = _build_employee_ranges(5, 0)  # 0 = no upper limit
     assert "10001," in ranges
 
@@ -767,7 +767,7 @@ def test_apollo_seen_ids_are_skipped():
 # ---------------------------------------------------------------------------
 
 def test_investor_org_name_boosts_score():
-    from src.scoring.scorer import LeadScorer
+    from lead_pipeline.scoring.scorer import LeadScorer
     config = load_config("config/config.example.yaml")
     scorer = LeadScorer(config)
 
@@ -789,7 +789,7 @@ def test_investor_org_name_boosts_score():
 # ---------------------------------------------------------------------------
 
 def test_seen_apollo_ids_round_trip(tmp_path):
-    from src.utils.database import LeadDatabase
+    from lead_pipeline.utils.database import LeadDatabase
 
     db = LeadDatabase(str(tmp_path / "test.db"))
 
@@ -809,21 +809,21 @@ def test_seen_apollo_ids_round_trip(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_get_profile_returns_correct_titles():
-    from src.utils.profiles import get_profile
+    from lead_pipeline.utils.profiles import get_profile
     p = get_profile("vc_pe")
     assert "Partner" in p.person_titles
     assert p.employee_count_max <= 200
 
 
 def test_get_profile_raises_on_unknown():
-    from src.utils.profiles import get_profile
+    from lead_pipeline.utils.profiles import get_profile
     import pytest
     with pytest.raises(ValueError, match="Unknown profile"):
         get_profile("nonexistent_profile")
 
 
 def test_list_profiles_contains_all_six():
-    from src.utils.profiles import list_profiles
+    from lead_pipeline.utils.profiles import list_profiles
     names = list_profiles()
     assert set(names) >= {"vc_pe", "founders", "family_office", "real_estate", "healthcare", "broad_hnw"}
 
@@ -885,7 +885,7 @@ def test_search_rotation_overrides_base_titles(monkeypatch):
 
 def test_cooldown_fallback_retries_without_seen_ids(monkeypatch):
     """When all candidates are suppressed, pipeline retries with empty seen_ids."""
-    from src.utils.database import LeadDatabase
+    from lead_pipeline.utils.database import LeadDatabase
 
     config = load_config("config/config.example.yaml")
     config.sources.mode = "api"
@@ -922,12 +922,12 @@ def test_cooldown_fallback_retries_without_seen_ids(monkeypatch):
     def fake_save(self, people):
         pass
 
-    monkeypatch.setattr("src.pipeline.ApolloClient.search_people", fake_search)
-    monkeypatch.setattr("src.utils.database.LeadDatabase.load_seen_apollo_ids", fake_load_seen)
-    monkeypatch.setattr("src.utils.database.LeadDatabase.save_seen_apollo_ids", fake_save)
-    monkeypatch.setattr("src.pipeline.SECEdgarMatcher.match", lambda self, q: (False, []))
+    monkeypatch.setattr("lead_pipeline.pipeline.ApolloClient.search_people", fake_search)
+    monkeypatch.setattr("lead_pipeline.utils.database.LeadDatabase.load_seen_apollo_ids", fake_load_seen)
+    monkeypatch.setattr("lead_pipeline.utils.database.LeadDatabase.save_seen_apollo_ids", fake_save)
+    monkeypatch.setattr("lead_pipeline.pipeline.SECEdgarMatcher.match", lambda self, q: (False, []))
 
-    from src.pipeline import LeadPipeline
+    from lead_pipeline.pipeline import LeadPipeline
     leads, _ = LeadPipeline(config).run(zip_codes=["06830"], persist=False)
 
     assert call_count["n"] == 2  # first (suppressed) + fallback

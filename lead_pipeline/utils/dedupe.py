@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from src.models import Lead
+from lead_pipeline.models import Lead
 
 
 def deduplicate_leads(leads: list[Lead], fields: list[str]) -> list[Lead]:

@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.models import PropertyRecord, TargetArea
-from src.utils.config import Config
-from src.utils.logger import setup_logger
+from lead_pipeline.models import PropertyRecord, TargetArea
+from lead_pipeline.utils.config import Config
+from lead_pipeline.utils.logger import setup_logger
 
 logger = setup_logger("collectors.property")
 

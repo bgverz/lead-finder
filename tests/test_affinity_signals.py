@@ -1,7 +1,7 @@
-from src.models import Lead
-from src.scoring.scorer import LeadScorer
-from src.scoring.signals import apply_affinity_signals
-from src.utils.config import load_config
+from lead_pipeline.models import Lead
+from lead_pipeline.scoring.scorer import LeadScorer
+from lead_pipeline.scoring.signals import apply_affinity_signals
+from lead_pipeline.utils.config import load_config
 
 
 def test_affinity_signals_generate_tags_from_apollo_metadata():

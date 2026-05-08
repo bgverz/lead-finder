@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.models import BusinessEntity
-from src.utils.config import Config
+from lead_pipeline.models import BusinessEntity
+from lead_pipeline.utils.config import Config
 
 
 class BusinessEntityMatcher:

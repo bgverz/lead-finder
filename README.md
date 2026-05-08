@@ -18,8 +18,8 @@ Built for pre-IPO / secondary market sales teams selling shares in late-stage pr
 ## Quick Start
 
 ```bash
-git clone (https://github.com/bgverz/lead-finder)
-cd investor-lead-pipeline
+git clone https://github.com/bgverz/lead-finder
+cd lead-finder
 pip install -r requirements.txt
 cp .env.example .env
 edit .env
@@ -129,55 +129,35 @@ output:
 ## Project Structure
 
 ```
-investor-lead-pipeline/
+lead-finder/
 ├── lead_pipeline/
-│   ├── __init__.py              # Public command package
+│   ├── __init__.py
 │   ├── __main__.py              # python -m lead_pipeline
-│   └── cli.py                   # run, doctor, smoke-test commands
+│   ├── cli.py                   # run, doctor, smoke-test commands
+│   ├── collectors/              # Census, property, business, SEC collectors
+│   ├── enrichment/              # Apollo, ATTOM, phone enrichment
+│   ├── output/                  # Excel exporter
+│   ├── scoring/                 # Scoring and affinity signals
+│   ├── utils/                   # Config, database, logging, dedupe helpers
+│   ├── models.py                # Shared dataclasses
+│   └── pipeline.py              # Pipeline orchestration
 ├── config/
 │   ├── config.example.yaml      # Template config (commit this)
 │   └── config.yaml              # Your config with API keys (DO NOT commit)
-├── src/
-│   ├── main.py                  # CLI entry point & pipeline orchestrator
-│   ├── collectors/
-│   │   ├── __init__.py
-│   │   ├── census.py            # Census Bureau API - geographic targeting
-│   │   ├── property.py          # County assessor / ATTOM - property records
-│   │   ├── business.py          # State SOS / OpenCorporates - entity matching
-│   │   └── sec_edgar.py         # SEC EDGAR - Form D filing search
-│   ├── enrichment/
-│   │   ├── __init__.py
-│   │   ├── apollo.py            # Apollo.io API - contact enrichment
-│   │   └── phone.py             # NumVerify - phone validation
-│   ├── scoring/
-│   │   ├── __init__.py
-│   │   └── scorer.py            # Weighted scoring engine
-│   ├── output/
-│   │   ├── __init__.py
-│   │   └── excel.py             # Formatted Excel output
-│   └── utils/
-│       ├── __init__.py
-│       ├── config.py            # Config loader
-│       ├── database.py          # SQLite storage layer
-│       ├── rate_limiter.py      # API rate limiting
-│       └── logger.py            # Structured logging
 ├── data/
 │   ├── input/                   # Optional local/manual inputs
 │   ├── sample/                  # Mock data used by smoke tests
-│   ├── raw/                     # Raw API responses (cached)
-│   ├── processed/               # Intermediate processed data
-│   └── output/                  # Final Excel output files
+│   └── output/                  # Final Excel output files (gitignored)
 ├── tests/
-│   ├── test_census.py
-│   ├── test_scorer.py
-│   └── test_pipeline.py
 ├── docs/
-│   └── api_setup_guide.md       # How to get API keys
+│   └── SETUP_REQUIRED.md
+├── scripts/
+│   ├── setup.sh
+│   ├── setup.ps1
+│   └── test_apollo.py
 ├── requirements.txt
+├── pytest.ini
 ├── .env.example
-├── setup.sh
-├── setup.ps1
-├── Makefile
 ├── .gitignore
 └── README.md
 ```

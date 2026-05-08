@@ -221,14 +221,14 @@ Option B: add credentials directly to `config/config.yaml` under `api_keys`.
 Run sample mode before using any real APIs:
 
 ```bash
-python -m src.main --config config/config.yaml
+python -m lead_pipeline run --config config/config.yaml
 pytest -q
 ```
 
 Run a targeted sample ZIP test:
 
 ```bash
-python -m src.main --config config/config.yaml --zip-codes 06830,06831
+python -m lead_pipeline run --config config/config.yaml --zip-codes 06830,06831
 ```
 
 When real integrations are implemented and credentials are present, switch:
@@ -241,7 +241,7 @@ sources:
 Then run:
 
 ```bash
-python -m src.main --config config/config.yaml --state CT
+python -m lead_pipeline run --config config/config.yaml --state CT
 ```
 
 If setup is incomplete, the CLI prints the missing account, key, or manual county/state choice before the pipeline reaches provider-specific code.

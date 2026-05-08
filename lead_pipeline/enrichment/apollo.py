@@ -8,8 +8,8 @@ from typing import Any
 
 import requests
 
-from src.utils.config import Config
-from src.utils.logger import setup_logger
+from lead_pipeline.utils.config import Config
+from lead_pipeline.utils.logger import setup_logger
 
 logger = setup_logger("enrichment.apollo")
 
@@ -206,7 +206,7 @@ class ApolloClient:
 
         # Apply built-in profile (overrides everything including rotation).
         if self.config.apollo.active_profile:
-            from src.utils.profiles import get_profile
+            from lead_pipeline.utils.profiles import get_profile
             try:
                 profile = get_profile(self.config.apollo.active_profile)
                 payload["person_titles"] = list(profile.person_titles)

@@ -7,8 +7,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from src.models import ContactInfo
-from src.utils.config import Config
+from lead_pipeline.models import ContactInfo
+from lead_pipeline.utils.config import Config
 
 
 class PhoneValidator:

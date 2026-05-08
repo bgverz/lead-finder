@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from src.enrichment.apollo import APOLLO_SEARCH_URL, ApolloClient
-from src.pipeline import LeadPipeline
-from src.utils.config import load_config
+from lead_pipeline.enrichment.apollo import APOLLO_SEARCH_URL, ApolloClient
+from lead_pipeline.pipeline import LeadPipeline
+from lead_pipeline.utils.config import load_config
 
 
 class FakeResponse:
@@ -86,8 +86,8 @@ def test_apollo_obfuscated_candidate_scores_via_signal_points(monkeypatch):
         has_full_name=False,
         display_name="Avery S.",
     )
-    monkeypatch.setattr("src.pipeline.ApolloClient.search_people", lambda self, seen_ids=None: [person])
-    monkeypatch.setattr("src.pipeline.SECEdgarMatcher.match", lambda self, search_term: (False, []))
+    monkeypatch.setattr("lead_pipeline.pipeline.ApolloClient.search_people", lambda self, seen_ids=None: [person])
+    monkeypatch.setattr("lead_pipeline.pipeline.SECEdgarMatcher.match", lambda self, search_term: (False, []))
 
     leads, _ = LeadPipeline(config).run(zip_codes=["06830"], persist=False)
     apollo_lead = next(lead for lead in leads if lead.apollo_person_id == "person-1")

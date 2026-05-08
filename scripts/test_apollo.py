@@ -1,6 +1,6 @@
 """Manual Apollo connectivity probe.
 
-Run directly with `python test_apollo.py`. Pytest should not make live API calls.
+Run directly with `python scripts/test_apollo.py`. Pytest should not make live API calls.
 """
 
 import os

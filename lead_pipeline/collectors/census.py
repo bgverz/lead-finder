@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 import requests
 
-from src.models import TargetArea
-from src.utils.config import Config
-from src.utils.logger import setup_logger
+from lead_pipeline.models import TargetArea
+from lead_pipeline.utils.config import Config
+from lead_pipeline.utils.logger import setup_logger
 
 logger = setup_logger("collectors.census")
 

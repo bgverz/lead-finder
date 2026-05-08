@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from src.utils.config import load_config
+from lead_pipeline.utils.config import load_config
 
 
 def test_load_config_accepts_sample_config():

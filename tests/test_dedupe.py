@@ -1,5 +1,5 @@
-from src.models import BusinessEntity, Lead
-from src.utils.dedupe import deduplicate_leads
+from lead_pipeline.models import BusinessEntity, Lead
+from lead_pipeline.utils.dedupe import deduplicate_leads
 
 
 def test_deduplicate_leads_merges_by_name_and_counts_properties():

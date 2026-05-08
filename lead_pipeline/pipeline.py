@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from src.collectors.business import BusinessEntityMatcher
-from src.collectors.census import CensusClient
-from src.collectors.property import PropertyRecordCollector
-from src.collectors.sec_edgar import SECEdgarMatcher
-from src.enrichment.apollo import ApolloClient, ApolloPerson
-from src.enrichment.attom import ATTOMClient
-from src.enrichment.phone import PhoneValidator
-from src.models import Lead
-from src.output.excel import ExcelExporter
-from src.scoring.scorer import LeadScorer
-from src.utils.config import Config
-from src.utils.database import LeadDatabase  # also used in _collect_apollo_candidates
-from src.utils.dedupe import deduplicate_leads
-from src.utils.logger import setup_logger
+from lead_pipeline.collectors.business import BusinessEntityMatcher
+from lead_pipeline.collectors.census import CensusClient
+from lead_pipeline.collectors.property import PropertyRecordCollector
+from lead_pipeline.collectors.sec_edgar import SECEdgarMatcher
+from lead_pipeline.enrichment.apollo import ApolloClient, ApolloPerson
+from lead_pipeline.enrichment.attom import ATTOMClient
+from lead_pipeline.enrichment.phone import PhoneValidator
+from lead_pipeline.models import Lead
+from lead_pipeline.output.excel import ExcelExporter
+from lead_pipeline.scoring.scorer import LeadScorer
+from lead_pipeline.utils.config import Config
+from lead_pipeline.utils.database import LeadDatabase  # also used in _collect_apollo_candidates
+from lead_pipeline.utils.dedupe import deduplicate_leads
+from lead_pipeline.utils.logger import setup_logger
 
 
 class LeadPipeline:

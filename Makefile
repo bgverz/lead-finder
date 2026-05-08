@@ -1,7 +1,7 @@
 .PHONY: setup doctor smoke-test test run
 
 setup:
-	sh setup.sh
+	sh scripts/setup.sh
 
 doctor:
 	python -m lead_pipeline doctor

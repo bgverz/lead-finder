@@ -1,6 +1,6 @@
 from lead_pipeline.cli import apply_mode, setup_blockers, setup_warnings
-from src.pipeline import _safe_error
-from src.utils.config import load_config
+from lead_pipeline.pipeline import _safe_error
+from lead_pipeline.utils.config import load_config
 
 
 def test_api_mode_does_not_block_on_attom_or_opencorporates():
