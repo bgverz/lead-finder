@@ -288,7 +288,7 @@ def open_latest(config_path: str) -> None:
 @main.command("prepare-reveal")
 @click.option("--config", "config_path", default="", help="Path to YAML config.")
 @click.option("--min-score", type=float, default=45.0, show_default=True, help="Minimum score to consider.")
-@click.option("--limit", type=int, default=25, show_default=True, help="Max leads to display.")
+@click.option("--limit", type=int, default=100, show_default=True, help="Max leads to display.")
 def prepare_reveal(config_path: str, min_score: float, limit: int) -> None:
     """Show top Apollo leads worth revealing and estimate credit cost."""
 

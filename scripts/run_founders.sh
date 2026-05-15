@@ -18,7 +18,7 @@ fi
 source venv/bin/activate
 
 echo ""
-echo ">>> python -m lead_pipeline run --mode api --profile founders --limit 25 --open"
+echo ">>> python -m lead_pipeline run --mode api --profile founders --limit 100 --open"
 echo ""
 
-python -m lead_pipeline run --mode api --profile founders --limit 25 --open
+python -m lead_pipeline run --mode api --profile founders --limit 100 --open
