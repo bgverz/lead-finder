@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from lead_pipeline.collectors.business import BusinessEntityMatcher
@@ -138,6 +139,14 @@ class LeadPipeline:
 
         leads.extend(self._apollo_people_to_leads(apollo_candidates))
 
+        # ── Hard country gate ────────────────────────────────────────────────
+        # Drop any lead with an explicit non-US country before scoring/output.
+        # This is the last-resort safety net; it catches anything that slipped
+        # through the Apollo-level filters (e.g. bad Apollo data, reveal updates).
+        # Leads with NO country/location data are passed through — those come
+        # from Census/property sources and were already geographically targeted.
+        leads = self._apply_country_gate(leads)
+
         deduped = deduplicate_leads(leads, self.config.pipeline.dedup_by)
         deduped = self.attom.enrich_leads(deduped)
         scored = [self.scorer.score(lead) for lead in deduped]
@@ -152,6 +161,15 @@ class LeadPipeline:
                 db.upsert_many(scored)
             finally:
                 db.close()
+
+        # Generate default output path if none provided
+        if output_path is None:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{self.config.output.filename_prefix}_{timestamp}.xlsx"
+            output_path = Path(self.config.output.output_dir) / filename
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
         workbook = self.exporter.export(scored, output_path)
         self.logger.info("Excel workbook written: %s", workbook)
@@ -233,6 +251,10 @@ class LeadPipeline:
                     revealed.append(person)
             people = revealed
 
+        # Re-run geo filter after reveals — the reveal API populates country/state
+        # for records that were blank in search results, surfacing non-US people.
+        people = self.apollo.filter_by_country(people)
+
         self.logger.info("Apollo candidates collected: %s", len(people))
         if limit is not None:
             people = people[:limit]
@@ -303,6 +325,52 @@ class LeadPipeline:
                 )
             )
         return leads
+
+    def _apply_country_gate(self, leads: list[Lead]) -> list[Lead]:
+        """Hard gate: drop any lead with an explicit non-US country before output.
+
+        Leads with an empty country field are passed through — they originate from
+        Census/property sources that are already US-geographically targeted, or
+        from Apollo records where Apollo's own server-side filter has already been
+        applied and country data simply isn't stored.
+
+        Leads with a populated non-US country field are always dropped regardless
+        of which source produced them.
+        """
+        target_countries = self.config.targeting.countries
+        if not target_countries:
+            return leads
+
+        target_codes = {c.upper() for c in target_countries if c.strip()}
+        # Long-form US name variants Apollo sometimes returns.
+        us_names = {
+            "united states", "united states of america",
+            "us", "usa", "u.s.", "u.s.a.", "u.s",
+        }
+
+        kept: list[Lead] = []
+        dropped = 0
+        for lead in leads:
+            country = (getattr(lead, "country", "") or "").strip()
+            if not country:
+                kept.append(lead)  # no country data — pass through
+            elif country.upper() in target_codes:
+                kept.append(lead)  # explicit US
+            elif "US" in target_codes and country.lower() in us_names:
+                kept.append(lead)  # long-form US name
+            else:
+                dropped += 1
+                self.logger.debug(
+                    "Country gate: dropping '%s' (country=%s)", lead.name, country
+                )
+
+        if dropped:
+            self.logger.warning(
+                "Country hard gate: dropped %d lead(s) with explicit non-US country. "
+                "Run with log_level: DEBUG to see per-lead details.",
+                dropped,
+            )
+        return kept
 
 
 def _safe_error(exc: Exception) -> str:

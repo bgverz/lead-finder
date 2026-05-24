@@ -393,6 +393,46 @@ def compare_profiles(config_path: str) -> None:
     click.echo("")
 
 
+@main.command("clear-cache")
+@click.option("--config", "config_path", default="", help="Path to YAML config.")
+@click.option("--leads", "clear_leads", is_flag=True, help="Also delete all stored leads (full reset).")
+def clear_cache(config_path: str, clear_leads: bool) -> None:
+    """Clear the seen-IDs cache so all Apollo leads surface again on the next run.
+
+    By default only the seen-candidates cache is cleared — stored leads and their
+    statuses are kept.  Pass --leads to wipe everything (full fresh start).
+    """
+    load_local_env()
+    try:
+        config = load_runtime_config(config_path)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    import sqlite3
+
+    db_path = config.pipeline.database_path
+    try:
+        conn = sqlite3.connect(db_path)
+        seen_count = conn.execute("SELECT COUNT(*) FROM seen_apollo_candidates").fetchone()[0]
+        conn.execute("DELETE FROM seen_apollo_candidates")
+        if clear_leads:
+            lead_count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
+            conn.execute("DELETE FROM leads")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name='leads'")
+            conn.commit()
+            click.echo(f"Cleared {seen_count} cached Apollo IDs.")
+            click.echo(f"Deleted {lead_count} stored leads.")
+            click.echo("Full reset complete — next run starts fresh.")
+        else:
+            conn.commit()
+            click.echo(f"Cleared {seen_count} cached Apollo IDs.")
+            click.echo("Stored leads and statuses kept.")
+            click.echo("Next run will surface all Apollo leads again.")
+        conn.close()
+    except Exception as exc:
+        raise click.ClickException(f"Could not clear cache: {exc}") from exc
+
+
 @main.command("import-feedback")
 @click.argument("csv_path", type=click.Path(exists=True))
 @click.option("--config", "config_path", default="", help="Path to YAML config.")

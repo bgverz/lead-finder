@@ -87,6 +87,9 @@ class ApolloConfig:
     max_pages: int = 1
     reveal_contacts: bool = False
     max_reveals_per_run: int = 0
+    # Web scraping fallback settings
+    web_reveal_enabled: bool = False
+    web_credentials: dict[str, str] = field(default_factory=dict)
     # Server-side filters sent directly to Apollo api_search payload.
     filters: dict[str, Any] = field(default_factory=dict)
     # Client-side title exclusions.

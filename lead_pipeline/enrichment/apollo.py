@@ -22,6 +22,31 @@ _US_COUNTRY_NAMES: frozenset[str] = frozenset({
     "u.s.", "u.s.a.", "u.s",
 })
 
+# US state/territory — both abbreviations (Apollo sometimes returns either form).
+_US_STATE_CODES: frozenset[str] = frozenset({
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    "DC", "PR", "GU", "VI", "AS", "MP",
+})
+
+_US_STATE_NAMES: frozenset[str] = frozenset({
+    "ALABAMA", "ALASKA", "ARIZONA", "ARKANSAS", "CALIFORNIA", "COLORADO",
+    "CONNECTICUT", "DELAWARE", "FLORIDA", "GEORGIA", "HAWAII", "IDAHO",
+    "ILLINOIS", "INDIANA", "IOWA", "KANSAS", "KENTUCKY", "LOUISIANA",
+    "MAINE", "MARYLAND", "MASSACHUSETTS", "MICHIGAN", "MINNESOTA",
+    "MISSISSIPPI", "MISSOURI", "MONTANA", "NEBRASKA", "NEVADA",
+    "NEW HAMPSHIRE", "NEW JERSEY", "NEW MEXICO", "NEW YORK",
+    "NORTH CAROLINA", "NORTH DAKOTA", "OHIO", "OKLAHOMA", "OREGON",
+    "PENNSYLVANIA", "RHODE ISLAND", "SOUTH CAROLINA", "SOUTH DAKOTA",
+    "TENNESSEE", "TEXAS", "UTAH", "VERMONT", "VIRGINIA", "WASHINGTON",
+    "WEST VIRGINIA", "WISCONSIN", "WYOMING",
+    "DISTRICT OF COLUMBIA", "PUERTO RICO", "GUAM", "VIRGIN ISLANDS",
+    "AMERICAN SAMOA", "NORTHERN MARIANA ISLANDS",
+})
+
 # Apollo employee-count range labels in ascending order.
 _EMPLOYEE_RANGE_BUCKETS: list[tuple[int, int | None, str]] = [
     (1, 10, "1,10"),
@@ -94,6 +119,10 @@ class ApolloClient:
         self.session = requests.Session()
         # Updated after every search_people call.
         self.last_stats: dict[str, int] = {}
+        # Web scraper for fallback contact reveals
+        self.web_scraper = None
+        self._web_scraper_enabled = getattr(config.apollo, 'web_reveal_enabled', False)
+        self._web_credentials = getattr(config.apollo, 'web_credentials', {})
 
     # ------------------------------------------------------------------
     # Public API
@@ -151,19 +180,82 @@ class ApolloClient:
             logger.warning("Skipping Apollo reveal because person id is missing.")
             return person
 
-        response = self.session.get(
-            APOLLO_REVEAL_URL_TEMPLATE.format(person_id=person.apollo_person_id),
-            headers=self._headers(),
-            timeout=30,
-        )
-        if response.status_code in {402, 403}:
-            logger.warning(
-                "Apollo reveal was denied; contact reveal may require additional permissions or credits."
+        # Try API reveal first
+        try:
+            response = self.session.get(
+                APOLLO_REVEAL_URL_TEMPLATE.format(person_id=person.apollo_person_id),
+                headers=self._headers(),
+                timeout=30,
             )
+            if response.status_code in {402, 403}:
+                logger.debug(f"Apollo API reveal denied for {person.apollo_person_id}, trying web fallback")
+                return self._try_web_reveal(person)
+                
+            response.raise_for_status()
+            data = response.json().get("person") or response.json()
+            revealed = self._parse_person({**person.raw, **data})
+            
+            # Check if API reveal actually returned contact info
+            if revealed.email or revealed.phone:
+                return revealed
+            else:
+                logger.debug(f"Apollo API returned no contact info for {person.apollo_person_id}, trying web fallback")
+                return self._try_web_reveal(person)
+                
+        except Exception as e:
+            logger.debug(f"Apollo API reveal failed for {person.apollo_person_id}: {e}, trying web fallback")
+            return self._try_web_reveal(person)
+
+    def _try_web_reveal(self, person: ApolloPerson) -> ApolloPerson:
+        """Fallback to web scraping for contact reveal."""
+        if not self._web_scraper_enabled:
+            logger.debug("Web scraping fallback disabled")
             return person
-        response.raise_for_status()
-        data = response.json().get("person") or response.json()
-        return self._parse_person({**person.raw, **data})
+            
+        if not self.web_scraper:
+            self._init_web_scraper()
+            
+        if not self.web_scraper:
+            return person
+        
+        try:
+            web_result = self.web_scraper.reveal_contact(person.apollo_person_id)
+            if web_result.get('email') or web_result.get('phone'):
+                # Update person with web-scraped contact info
+                updated_raw = person.raw.copy()
+                if web_result.get('email'):
+                    updated_raw['email'] = web_result['email']
+                if web_result.get('phone'):
+                    updated_raw['phone'] = web_result['phone']
+                    
+                return self._parse_person(updated_raw)
+        except Exception as e:
+            logger.warning(f"Web scraping reveal failed for {person.apollo_person_id}: {e}")
+            
+        return person
+    
+    def _init_web_scraper(self):
+        """Initialize web scraper if credentials are available."""
+        try:
+            from lead_pipeline.enrichment.apollo_web import ApolloWebScraper
+            
+            email = self._web_credentials.get('email')
+            password = self._web_credentials.get('password')
+            
+            if email and password:
+                self.web_scraper = ApolloWebScraper(email, password)
+                if self.web_scraper.login():
+                    logger.info("Apollo web scraper initialized successfully")
+                else:
+                    logger.warning("Apollo web scraper login failed")
+                    self.web_scraper = None
+            else:
+                logger.warning("Apollo web credentials not provided")
+        except ImportError:
+            logger.warning("Apollo web scraper not available")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Apollo web scraper: {e}")
+            self.web_scraper = None
 
     def search_probe(self) -> tuple[bool, bool, str]:
         """Check api_search connectivity with per_page=1 for doctor."""
@@ -183,6 +275,28 @@ class ApolloClient:
             return True, False, "connected; no people returned for current filters"
         person = self._parse_person(rows[0])
         return True, person.is_obfuscated, "connected"
+
+    def filter_by_country(self, people: list[ApolloPerson]) -> list[ApolloPerson]:
+        """Drop any person whose location can be confirmed as non-US.
+
+        Called a second time after reveal_contacts because the reveal API
+        often populates country/state fields that were blank in search results,
+        exposing non-US people who slipped through the initial filter.
+        """
+        target_codes = [c.upper() for c in (self.config.targeting.countries or []) if c.strip()]
+        if not target_codes:
+            return people
+        before = len(people)
+        kept = [p for p in people if self._is_target_country(p, target_codes)]
+        dropped = before - len(kept)
+        if dropped:
+            logger.warning(
+                "Apollo post-reveal geo filter: dropped %d non-%s lead(s) "
+                "whose country was populated by the reveal API.",
+                dropped,
+                "/".join(target_codes),
+            )
+        return kept
 
     # ------------------------------------------------------------------
     # Payload / filter helpers
@@ -336,7 +450,9 @@ class ApolloClient:
             stats["geo_filtered"] = before - len(people)
             if stats["geo_filtered"]:
                 logger.warning(
-                    "Apollo geo filter: dropped %d non-%s candidate(s) that slipped past server-side filter.",
+                    "Apollo geo filter: dropped %d non-%s candidate(s) — "
+                    "missing location data or explicit non-US country/state. "
+                    "Run with LOG_LEVEL=DEBUG to see per-lead details.",
                     stats["geo_filtered"],
                     "/".join(target_codes),
                 )
@@ -364,19 +480,53 @@ class ApolloClient:
         return any(excl.lower() in org_lower for excl in self.config.apollo.excluded_organizations)
 
     def _is_target_country(self, person: ApolloPerson, target_codes: list[str]) -> bool:
-        """Client-side country check. Empty country field → pass through (server filter is primary)."""
+        """Client-side country check.
+
+        Decision order:
+        1. Country field is populated:
+           - Matches a US code/name → keep.
+           - Anything else (explicit non-US) → drop.
+        2. Country is empty, state is populated:
+           - Recognised US state abbreviation OR full name → keep.
+           - Anything else (explicit non-US state/province) → drop.
+        3. No country AND no state data → pass through.
+           Apollo's server-side person_country_codes filter is the primary guard;
+           many US leads in Apollo's database simply have no location fields at all.
+        """
         if not target_codes:
             return True  # geo filtering disabled
+
         raw_country = person.country.strip()
-        if not raw_country:
-            return True  # no country data — server-side filter is the primary guard
-        country_upper = raw_country.upper()
-        if country_upper in target_codes:
-            return True
-        # Handle long-form names (e.g. "United States")
-        if raw_country.lower() in _US_COUNTRY_NAMES and "US" in target_codes:
-            return True
-        return False
+        if raw_country:
+            country_upper = raw_country.upper()
+            if country_upper in target_codes:
+                return True
+            if raw_country.lower() in _US_COUNTRY_NAMES and "US" in target_codes:
+                return True
+            # Explicit non-US country — drop.
+            logger.debug(
+                "Apollo geo filter: dropping '%s' — explicit non-US country '%s'.",
+                person.display_name,
+                raw_country,
+            )
+            return False
+
+        # Country is empty: use state as a tiebreaker.
+        raw_state = person.state.strip().upper()
+        if raw_state:
+            if raw_state in _US_STATE_CODES or raw_state in _US_STATE_NAMES:
+                return True  # confirmed US via state
+            # Populated but non-US state/province → drop.
+            logger.debug(
+                "Apollo geo filter: dropping '%s' — country empty, state '%s' is not a US state.",
+                person.display_name,
+                raw_state,
+            )
+            return False
+
+        # No country AND no state — pass through.
+        # Apollo's server-side filter is the primary guard for these records.
+        return True
 
     def _log_query_info(self, payload: dict[str, Any], start_page: int) -> None:
         titles = payload.get("person_titles") or []
